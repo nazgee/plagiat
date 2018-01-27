@@ -37,7 +37,9 @@ class Comparison(object):
 class ComparisonTokenSet(Comparison):
     def __init__(self, titles, lowercase):
         super(ComparisonTokenSet, self).__init__(titles, lowercase)
-        super(ComparisonTokenSet, self).setMetric(fuzz.token_set_ratio(self.titles[0], self.titles[1]))
+        metric = fuzz.token_set_ratio(self.titles[0], self.titles[1])
+        metric = metric * min(len(self.titles[0]), len(self.titles[1])) / max(len(self.titles[0]), len(self.titles[1]))
+        super(ComparisonTokenSet, self).setMetric(metric)
 
 # comparison method #2
 class ComparisonTokenSort(Comparison):
@@ -83,7 +85,7 @@ def printProgress(iteration, total, prefix='', suffix='', decimals=1, bar_length
 
 
 # bells and whistles; reads .csv file, creates requested comparisons, and returns list of results
-def dumpstat(inputfile="pubmed_result.csv", limitinput=5, limitoutput=5, method='tokenset', lowercase=True):
+def dumpstat(inputfile="pubmed_result.csv", limitinput=5, minscore=75, maxscore=99, limitoutput=5, method='tokenset', lowercase=True):
 
     if method not in getComparisonMethods():
         raise NotImplementedError("method " + method + " is not implemented")
@@ -116,13 +118,24 @@ def dumpstat(inputfile="pubmed_result.csv", limitinput=5, limitoutput=5, method=
     # TODO run comparisons in parallel
     index = 0
     for pair in itertools.combinations(titles, r=2):
-        c = getComparisonType(method)(pair, lowercase)
+        compare  = getComparisonType(method)
+        c = compare(pair, lowercase)
         # FIXME wasting a lot of memory here makes it impossible to work on big sets.
         # Maybe append only if better than worst of top 'limitinput' best ones
-        # and use a fixed-width container capped to 'limitinput' 
-        comparisons.append(c)
+        # and use a fixed-width container capped to 'limitinput'
+        if (c.metric >= minscore and c.metric <= maxscore):
+            l = len(comparisons)
+            if l > limitoutput:
+                if (comparisons[l - 1].metric < c.metric):
+                    comparisons[l - 1] = c
+                    print (c.toString())
+                    comparisons.sort(key=lambda x: x.metric, reverse=True)
+            else: 
+                comparisons.append(c)
+                print (c.toString())
+                comparisons.sort(key=lambda x: x.metric, reverse=True)
         
-        if ((index % 1000) == 0):
+        if ((index % 3000) == 0):
             printProgress(index, totalComparisons, "Working... ")
         index = index + 1
         
@@ -130,6 +143,8 @@ def dumpstat(inputfile="pubmed_result.csv", limitinput=5, limitoutput=5, method=
     
     # sort the comparison results, so better ones are first
     comparisons.sort(key=lambda x: x.metric, reverse=True)
+    
+    print "=========== final results ==========="
     
     # display results
     index = 0
@@ -153,6 +168,8 @@ def main(argv=None): # IGNORE:C0111
         parser.add_argument("--verbose", dest="verbose", action='store_true', help="be verbose", default=True)
         parser.add_argument("--lowercase", dest="lowercase", action='store_true', help="make lowercase before comparison")
         parser.add_argument("--limitinput", dest="limitinput", type=int, help="number of titles to compare", default=sys.maxint)
+        parser.add_argument("--minscore", dest="minscore", type=int, help="minimum score of comparison to be included in the output", default=75)
+        parser.add_argument("--maxscore", dest="maxscore", type=int, help="maximum score of comparison to be included in the output", default=99)
         parser.add_argument("--limitoutput", dest="limitoutput", type=int, help="number of comparisons to return", default=10)
         parser.add_argument("--data", dest="filedata", nargs='?', help="file to read titles from [default: %(default)s]", default='pubmed_result.csv')
         parser.add_argument("--method", dest="method", nargs='?', help="comparison method to use, one of: {" + ', '.join(getComparisonMethods()) + "} [default: %(default)s]", default=getComparisonMethods()[0])
@@ -165,13 +182,15 @@ def main(argv=None): # IGNORE:C0111
             print "data        = " + args.filedata
             print "limitinput  = " + str(args.limitinput)
             print "limitoutput = " + str(args.limitoutput)
+            print "minscore    = " + str(args.minscore)
+            print "maxscore    = " + str(args.maxscore)
             print "method      = " + str(args.method)
             print "lowercase   = " + str(args.lowercase)
             print "====="
         
         print "max number of combinations to check: " + str(calculateCombinationsNumber(args.limitinput))
         
-        dumpstat(args.filedata, args.limitinput, args.limitoutput, args.method, args.lowercase)
+        dumpstat(args.filedata, args.limitinput, args.minscore, args.maxscore, args.limitoutput, args.method, args.lowercase)
 
     except KeyboardInterrupt:
         ### handle keyboard interrupt ###
