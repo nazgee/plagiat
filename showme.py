@@ -48,12 +48,22 @@ class Parser(object):
         return "?"
     
     def dump(self):
+        info1 = self.getInfo(self.title1)                
+        info2 = self.getInfo(self.title2)
+
+        self.title1 = self.title1.rstrip('.') + " "
+        self.title2 = self.title2.rstrip('.') + " "
+
         with tempfile.NamedTemporaryFile() as temp1:
+
+            
             temp1.write(self.title1)
             temp1.flush()
             with tempfile.NamedTemporaryFile() as temp2:
                 temp2.write(self.title2)
                 temp2.flush()
+
+
 
                 proc = subprocess.Popen(["wdiff", "-w", "col_green", "-x", "col_escape", "-y", "col_red", "-z", "col_escape", temp1.name, temp2.name], stdout=subprocess.PIPE)
                 output = proc.stdout.read()
@@ -64,20 +74,12 @@ class Parser(object):
                 output = output.replace("col_red", col_red)
                 output = output.replace("col_escape", col_escape)
 
-                info1 = self.getInfo(self.title1)                
-                info2 = self.getInfo(self.title2)                
                 
                 for pat in matches1:
-                    bound = " "
-                    if (pat.endswith(".")):
-                        bound = ""
-                    self.title1 = self.title1.replace(" " + pat + bound, " " + col_green + pat + col_escape + bound, 1)
+                    self.title1 = self.title1.replace(" " + pat + " ", " " + col_green + pat + col_escape + " ", 1)
                     
                 for pat in matches2:
-                    bound = " "
-                    if (pat.endswith(".")):
-                        bound = ""
-                    self.title2 = self.title2.replace(" " + pat + bound, " " + col_red + pat + col_escape + bound, 1)
+                    self.title2 = self.title2.replace(" " + pat + " ", " " + col_red + pat + col_escape + " ", 1)
                   
                 
                 print "Metryka  = " + str(self.metric)  
