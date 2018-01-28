@@ -17,8 +17,8 @@ import re
 # - genome-wide association study of alcohol use disorder identification test (audit) scores in 20 328 research participants of european ancestry.
 # - identification of novel risk loci for restless legs syndrome in genome-wide association studies in individuals of european ancestry: a meta-analysis.
 
-col_green = "\033[1;32m"
-col_red = "\033[1;31m"
+col_green = "\033[42m"
+col_red = "\033[43m"
 col_escape = "\033[0m"
 
 class Parser(object):
@@ -68,10 +68,16 @@ class Parser(object):
                 info2 = self.getInfo(self.title2)                
                 
                 for pat in matches1:
-                    self.title1 = self.title1.replace(pat, col_green + pat + col_escape, 1)
+                    bound = " "
+                    if (pat.endswith(".")):
+                        bound = ""
+                    self.title1 = self.title1.replace(" " + pat + bound, " " + col_green + pat + col_escape + bound, 1)
                     
                 for pat in matches2:
-                    self.title2 = self.title2.replace(pat, col_red + pat + col_escape, 1)
+                    bound = " "
+                    if (pat.endswith(".")):
+                        bound = ""
+                    self.title2 = self.title2.replace(" " + pat + bound, " " + col_red + pat + col_escape + bound, 1)
                   
                 
                 print "Metryka  = " + str(self.metric)  
@@ -84,10 +90,10 @@ class Parser(object):
     
     def feed (self, line):
         line = line.rstrip()
-        if (line.startswith("M=")):
+        if ("M=" in line):
             self.title1 = None
             self.title2 = None
-            self.metric = line.strip("M=")
+            self.metric = re.sub(".*M=", "", line)
         elif (self.title1 == None):
             self.title1 = " " + line.strip("- ")
         elif (self.title2 == None):
