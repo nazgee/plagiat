@@ -9,6 +9,7 @@ import traceback
 import string
 import tempfile
 import subprocess
+import re
 
 
 
@@ -16,12 +17,18 @@ import subprocess
 # - genome-wide association study of alcohol use disorder identification test (audit) scores in 20 328 research participants of european ancestry.
 # - identification of novel risk loci for restless legs syndrome in genome-wide association studies in individuals of european ancestry: a meta-analysis.
 
+col_green = "\033[1;32m"
+col_red = "\033[1;31m"
+col_escape = "\033[0m"
+
 class Parser(object):
+    
     def __init__(self, data):
-        self.data = data
+        self.data_file = data
         self.title1 = None
         self.title2 = None
         self.metric = None
+        self.data_reader = csv.reader(open(data, "r"))
         
     def setMetric(self, metric):
         self.metric = metric
@@ -32,10 +39,15 @@ class Parser(object):
     def setTitle2(self, title2):
         self.title1 = title2
     
+    def getInfo(self, title):
+        self.data_reader = csv.reader(open(self.data_file, "r"))
+        for row in self.data_reader:
+            if (row[0].lower() == title.strip()):
+                return "https://www.ncbi.nlm.nih.gov" + row[1] + " " + row[2]
+
+        return "?"
+    
     def dump(self):
-        print "metric=" + str(self.metric)
-        print "title1=" + self.title1
-        print "title2=" + self.title2
         with tempfile.NamedTemporaryFile() as temp1:
             temp1.write(self.title1)
             temp1.flush()
@@ -43,7 +55,31 @@ class Parser(object):
                 temp2.write(self.title2)
                 temp2.flush()
 
-                subprocess.call(["wdiff", "-w", "\033[0;31m", "-x", "\033[0m", "-y", "\033[0;32m", "-z", "\033[0m", temp1.name, temp2.name])
+                proc = subprocess.Popen(["wdiff", "-w", "col_green", "-x", "col_escape", "-y", "col_red", "-z", "col_escape", temp1.name, temp2.name], stdout=subprocess.PIPE)
+                output = proc.stdout.read()
+                
+                matches1 = re.findall("col_green" + "(.*?)" + "col_escape" ,output)
+                matches2 = re.findall("col_red" + "(.*?)" + "col_escape" ,output)
+                output = output.replace("col_green", col_green)
+                output = output.replace("col_red", col_red)
+                output = output.replace("col_escape", col_escape)
+
+                info1 = self.getInfo(self.title1)                
+                info2 = self.getInfo(self.title2)                
+                
+                for pat in matches1:
+                    self.title1 = self.title1.replace(pat, col_green + pat + col_escape, 1)
+                    
+                for pat in matches2:
+                    self.title2 = self.title2.replace(pat, col_red + pat + col_escape, 1)
+                  
+                
+                print "Metryka  = " + str(self.metric)  
+                print "Tytuł1   =" + self.title1
+                print "Tytuł2   =" + self.title2
+#                 print "Tytuł1+2 =" + output
+                print "Info1    = " + info1
+                print "Info2    = " + info2
                 print ""
     
     def feed (self, line):
@@ -53,9 +89,9 @@ class Parser(object):
             self.title2 = None
             self.metric = line.strip("M=")
         elif (self.title1 == None):
-            self.title1 = line.strip("- ")
+            self.title1 = " " + line.strip("- ")
         elif (self.title2 == None):
-            self.title2 = line.strip("- ")
+            self.title2 = " " + line.strip("- ")
             self.dump()
         
 
@@ -85,7 +121,7 @@ def main(argv=None): # IGNORE:C0111
         # Process arguments
         args = parser.parse_args()
         
-        if (args.verbose):
+        if (False and args.verbose):
             print "====="
             print "data        = " + args.filedata
             print "titles      = " + args.filetitles
